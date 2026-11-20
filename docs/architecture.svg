@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1440" width="1200" height="1440" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Caffeine remote-render POC: architecture, development process and Unity MCP use</title>
+  <defs>
+    <marker id="aO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ffb454"/></marker>
+    <marker id="aB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f8cff"/></marker>
+    <marker id="aG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3ecf8e"/></marker>
+    <marker id="aP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b18cff"/></marker>
+    <marker id="aW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b98b0"/></marker>
+  </defs>
+
+  <rect width="1200" height="1440" fill="#0f1420"/>
+
+  <!-- Header -->
+  <text x="30" y="44" font-size="26" font-weight="700" fill="#e6edf7">Caffeine remote-render POC</text>
+  <text x="30" y="70" font-size="14" fill="#8b98b0">Unity on an NVIDIA GPU → NVENC H.264 → WebRTC → Chrome, with input and telemetry coming back. Built end to end by Claude.</text>
+
+  <!-- ============ 1. Runtime architecture ============ -->
+  <text x="30" y="112" font-size="16" font-weight="700" fill="#e6edf7">1 · Runtime architecture</text>
+
+  <!-- Server -->
+  <rect x="30" y="130" width="470" height="440" rx="10" fill="#141c2e" stroke="#4f8cff" stroke-width="1.5"/>
+  <text x="50" y="157" font-size="14" font-weight="700" fill="#4f8cff">SERVER · Unity standalone player (Windows, D3D11, RTX 5060 Ti)</text>
+
+  <g font-size="12" fill="#e6edf7">
+    <rect x="50" y="175" width="430" height="50" rx="6" fill="#1b2740" stroke="#33466b"/>
+    <text x="64" y="195" font-weight="600">MoleculeBuilder</text><text x="64" y="212" fill="#9fb0cc">24 atoms, 25 bonds built in code; CPK colours; pick colliders</text>
+
+    <rect x="50" y="240" width="430" height="60" rx="6" fill="#1b2740" stroke="#33466b"/>
+    <text x="64" y="260" font-weight="600">SceneController (server-authoritative)</text>
+    <text x="64" y="277" fill="#9fb0cc">input queue → orbit / ray-pick + trackball grab / zoom / reset</text>
+    <text x="64" y="291" fill="#9fb0cc">then camera, then 16-cell photon block drawn into the frame</text>
+
+    <rect x="50" y="315" width="430" height="50" rx="6" fill="#1b2740" stroke="#33466b"/>
+    <text x="64" y="335" font-weight="600">Camera → RenderTexture</text><text x="64" y="352" fill="#9fb0cc">GPU texture path, 1280x720 at 60 fps, no CPU readback</text>
+
+    <rect x="50" y="380" width="430" height="50" rx="6" fill="#1b2740" stroke="#ffb454"/>
+    <text x="64" y="400" font-weight="600">NVENC H.264 (libwebrtc “NvCodec”)</text><text x="64" y="417" fill="#9fb0cc">hardware encode, ≤5 Mbps, about 2 ms per frame</text>
+
+    <rect x="50" y="445" width="430" height="50" rx="6" fill="#1b2740" stroke="#33466b"/>
+    <text x="64" y="465" font-weight="600">StreamServer (com.unity.webrtc 3.0.0)</text><text x="64" y="482" fill="#9fb0cc">peer connection, 2 data channels, acks, 4 Hz telemetry, CSV</text>
+
+    <rect x="50" y="510" width="430" height="50" rx="6" fill="#1b2740" stroke="#33466b"/>
+    <text x="64" y="530" font-weight="600">WsSignalingServer</text><text x="64" y="547" fill="#9fb0cc">raw WebSocket on :8080; also serves client/ over HTTP</text>
+  </g>
+  <g stroke="#8b98b0" stroke-width="1.5" marker-end="url(#aW)">
+    <line x1="265" y1="226" x2="265" y2="239"/><line x1="265" y1="301" x2="265" y2="314"/><line x1="265" y1="366" x2="265" y2="379"/>
+    <line x1="265" y1="431" x2="265" y2="444"/><line x1="265" y1="496" x2="265" y2="509"/>
+  </g>
+
+  <!-- Client -->
+  <rect x="700" y="130" width="470" height="440" rx="10" fill="#14231f" stroke="#3ecf8e" stroke-width="1.5"/>
+  <text x="720" y="157" font-size="14" font-weight="700" fill="#3ecf8e">CLIENT · one HTML page in Chrome (no install, no framework)</text>
+
+  <g font-size="12" fill="#e6edf7">
+    <rect x="720" y="175" width="430" height="50" rx="6" fill="#1c3029" stroke="#2f5a4a"/>
+    <text x="734" y="195" font-weight="600">Latency + HUD + CSV export</text><text x="734" y="212" fill="#a6c7b9">input RTT and photon latency, p50 / p95, stats overlay</text>
+
+    <rect x="720" y="240" width="430" height="60" rx="6" fill="#1c3029" stroke="#2f5a4a"/>
+    <text x="734" y="260" font-weight="600">RTCPeerConnection.getStats()</text>
+    <text x="734" y="277" fill="#a6c7b9">decoded fps, frame size, bitrate, jitter, packets lost, decode time,</text>
+    <text x="734" y="291" fill="#a6c7b9">ICE round-trip time, logged each second</text>
+
+    <rect x="720" y="315" width="430" height="50" rx="6" fill="#1c3029" stroke="#2f5a4a"/>
+    <text x="734" y="335" font-weight="600">Photon decoder</text><text x="734" y="352" fill="#a6c7b9">requestVideoFrameCallback + canvas read of the 16-cell block</text>
+
+    <rect x="720" y="380" width="430" height="50" rx="6" fill="#1c3029" stroke="#ffb454"/>
+    <text x="734" y="400" font-weight="600">&lt;video&gt; element</text><text x="734" y="417" fill="#a6c7b9">plays the H.264 track, jitter buffer target 0</text>
+
+    <rect x="720" y="445" width="430" height="50" rx="6" fill="#1c3029" stroke="#2f5a4a"/>
+    <text x="734" y="465" font-weight="600">Input capture + data channels</text><text x="734" y="482" fill="#a6c7b9">pointer / wheel / key → 0..1 (letterbox-aware); sends intents only</text>
+
+    <rect x="720" y="510" width="430" height="50" rx="6" fill="#1c3029" stroke="#2f5a4a"/>
+    <text x="734" y="530" font-weight="600">Signalling client</text><text x="734" y="547" fill="#a6c7b9">WebSocket; receives the offer, sends the answer and ICE</text>
+  </g>
+  <g stroke="#8b98b0" stroke-width="1.5" marker-end="url(#aW)">
+    <line x1="935" y1="379" x2="935" y2="366"/><line x1="935" y1="314" x2="935" y2="301"/><line x1="935" y1="239" x2="935" y2="226"/>
+  </g>
+
+  <!-- Links between server and client -->
+  <g font-size="11" fill="#ffb454" text-anchor="middle">
+    <text x="600" y="408">H.264 video (RTP)</text>
+    <text x="600" y="462">input (unordered) · control (reliable)</text>
+    <text x="600" y="511">acks + telemetry back</text>
+    <text x="600" y="534">WebSocket :8080 · SDP + ICE</text>
+  </g>
+  <g stroke="#ffb454" stroke-width="2">
+    <line x1="480" y1="415" x2="700" y2="415" marker-end="url(#aO)"/>
+    <line x1="700" y1="468" x2="480" y2="468" marker-end="url(#aO)"/>
+    <line x1="480" y1="493" x2="700" y2="493" marker-end="url(#aO)"/>
+    <line x1="480" y1="540" x2="700" y2="540" marker-start="url(#aO)" marker-end="url(#aO)"/>
+  </g>
+  <text x="30" y="592" font-size="12" fill="#8b98b0">The client only sends pointer state and normalised coordinates. The server decides what is hit and what moves. 1:1 session, no broker, no auth, LAN or localhost (TURN is out of scope).</text>
+
+  <!-- ============ 2. Development process ============ -->
+  <text x="30" y="640" font-size="16" font-weight="700" fill="#e6edf7">2 · Development process</text>
+
+  <g font-size="11" fill="#9fb0cc">
+    <g transform="translate(30,656)"><rect width="150" height="150" rx="8" fill="#1a1630" stroke="#b18cff"/><circle cx="20" cy="22" r="11" fill="#b18cff"/><text x="20" y="26" font-size="12" font-weight="700" fill="#0f1420" text-anchor="middle">1</text><text x="38" y="26" font-size="13" font-weight="700" fill="#e6edf7">Brief + checks</text>
+      <text x="12" y="56">Read the spec. Confirmed</text><text x="12" y="72">com.unity.webrtc 3.0.0 is</text><text x="12" y="88">stable and targets Unity</text><text x="12" y="104">6000.0+; added it and</text><text x="12" y="120">checked the console.</text></g>
+    <g transform="translate(195,656)"><rect width="150" height="150" rx="8" fill="#1a1630" stroke="#b18cff"/><circle cx="20" cy="22" r="11" fill="#b18cff"/><text x="20" y="26" font-size="12" font-weight="700" fill="#0f1420" text-anchor="middle">2</text><text x="38" y="26" font-size="13" font-weight="700" fill="#e6edf7">M1 Molecule</text>
+      <text x="12" y="56">Coded the purine rings,</text><text x="12" y="72">carbonyls and methyls;</text><text x="12" y="88">checked 24 atoms and 25</text><text x="12" y="104">bonds, then viewed it</text><text x="12" y="120">from four angles.</text></g>
+    <g transform="translate(360,656)"><rect width="150" height="150" rx="8" fill="#1a1630" stroke="#b18cff"/><circle cx="20" cy="22" r="11" fill="#b18cff"/><text x="20" y="26" font-size="12" font-weight="700" fill="#0f1420" text-anchor="middle">3</text><text x="38" y="26" font-size="13" font-weight="700" fill="#e6edf7">M2 Video</text>
+      <text x="12" y="56">Camera → RenderTexture</text><text x="12" y="72">→ NVENC, WebSocket</text><text x="12" y="88">signalling, the Chrome</text><text x="12" y="104">page. Stats showed</text><text x="12" y="120">NvCodec at 720p60.</text></g>
+    <g transform="translate(525,656)"><rect width="150" height="150" rx="8" fill="#1a1630" stroke="#b18cff"/><circle cx="20" cy="22" r="11" fill="#b18cff"/><text x="20" y="26" font-size="12" font-weight="700" fill="#0f1420" text-anchor="middle">4</text><text x="38" y="26" font-size="13" font-weight="700" fill="#e6edf7">M3 Input + RTT</text>
+      <text x="12" y="56">Drag orbits the camera.</text><text x="12" y="72">First RTT read ~160 ms:</text><text x="12" y="88">acks rode the 4 Hz</text><text x="12" y="104">telemetry. Added a per-</text><text x="12" y="120">frame ack: ~24 ms.</text></g>
+    <g transform="translate(690,656)"><rect width="150" height="150" rx="8" fill="#1a1630" stroke="#b18cff"/><circle cx="20" cy="22" r="11" fill="#b18cff"/><text x="20" y="26" font-size="12" font-weight="700" fill="#0f1420" text-anchor="middle">5</text><text x="38" y="26" font-size="13" font-weight="700" fill="#e6edf7">M4–5 Grab/zoom</text>
+      <text x="12" y="56">Ray pick on enlarged</text><text x="12" y="72">colliders, trackball</text><text x="12" y="88">rotate, wheel zoom,</text><text x="12" y="104">R to reset. Grid test:</text><text x="12" y="120">38 of 240 points hit.</text></g>
+    <g transform="translate(855,656)"><rect width="150" height="150" rx="8" fill="#1a1630" stroke="#b18cff"/><circle cx="20" cy="22" r="11" fill="#b18cff"/><text x="20" y="26" font-size="12" font-weight="700" fill="#0f1420" text-anchor="middle">6</text><text x="38" y="26" font-size="13" font-weight="700" fill="#e6edf7">M6 Photon/CSV</text>
+      <text x="12" y="56">16-bit block drawn in</text><text x="12" y="72">every frame, decoded by</text><text x="12" y="88">the client; server and</text><text x="12" y="104">client CSV logs; 20 s</text><text x="12" y="120">run, ~1,200 samples.</text></g>
+    <g transform="translate(1020,656)"><rect width="150" height="150" rx="8" fill="#1a1630" stroke="#b18cff"/><circle cx="20" cy="22" r="11" fill="#b18cff"/><text x="20" y="26" font-size="12" font-weight="700" fill="#0f1420" text-anchor="middle">7</text><text x="38" y="26" font-size="13" font-weight="700" fill="#e6edf7">M7 Docs</text>
+      <text x="12" y="56">README, latency results</text><text x="12" y="72">note, screenshot, this</text><text x="12" y="88">diagram, and a single</text><text x="12" y="104">git commit of the whole</text><text x="12" y="120">working tree.</text></g>
+  </g>
+  <g stroke="#8b98b0" stroke-width="1.5" marker-end="url(#aW)">
+    <line x1="181" y1="731" x2="194" y2="731"/><line x1="346" y1="731" x2="359" y2="731"/><line x1="511" y1="731" x2="524" y2="731"/>
+    <line x1="676" y1="731" x2="689" y2="731"/><line x1="841" y1="731" x2="854" y2="731"/><line x1="1006" y1="731" x2="1019" y2="731"/>
+  </g>
+
+  <!-- Test loop -->
+  <text x="30" y="838" font-size="13" font-weight="700" fill="#e6edf7">The loop used for every step</text>
+  <g font-size="11" fill="#e6edf7" text-anchor="middle">
+    <rect x="30" y="852" width="210" height="62" rx="8" fill="#1b2740" stroke="#33466b"/><text x="135" y="876">Write C# / HTML</text><text x="135" y="892" fill="#9fb0cc">files on disk, no manual</text><text x="135" y="906" fill="#9fb0cc">editor work</text>
+    <rect x="262" y="852" width="210" height="62" rx="8" fill="#1b2740" stroke="#33466b"/><text x="367" y="876">Unity recompiles</text><text x="367" y="892" fill="#9fb0cc">wait for the new assembly,</text><text x="367" y="906" fill="#9fb0cc">domain reload</text>
+    <rect x="494" y="852" width="210" height="62" rx="8" fill="#241c3d" stroke="#b18cff"/><text x="599" y="876">Unity MCP</text><text x="599" y="892" fill="#c9b4ff">read console, run editor</text><text x="599" y="906" fill="#c9b4ff">code, build the player</text>
+    <rect x="726" y="852" width="210" height="62" rx="8" fill="#1b2740" stroke="#33466b"/><text x="831" y="876">Launch + connect</text><text x="831" y="892" fill="#9fb0cc">start CaffeineServer.exe,</text><text x="831" y="906" fill="#9fb0cc">open the page in Chrome</text>
+    <rect x="958" y="852" width="212" height="62" rx="8" fill="#14231f" stroke="#3ecf8e"/><text x="1064" y="876">Drive + measure</text><text x="1064" y="892" fill="#a6c7b9">scripted pointer events,</text><text x="1064" y="906" fill="#a6c7b9">stats, screenshots</text>
+  </g>
+  <g stroke="#8b98b0" stroke-width="1.5" marker-end="url(#aW)">
+    <line x1="241" y1="883" x2="261" y2="883"/><line x1="473" y1="883" x2="493" y2="883"/><line x1="705" y1="883" x2="725" y2="883"/><line x1="937" y1="883" x2="957" y2="883"/>
+  </g>
+  <path d="M1064,915 V934 H135 V916" fill="none" stroke="#8b98b0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#aW)"/>
+  <text x="600" y="930" font-size="11" fill="#8b98b0" text-anchor="middle" style="paint-order:stroke" stroke="#0f1420" stroke-width="4">fix and repeat</text>
+
+  <!-- ============ 3. Unity MCP ============ -->
+  <text x="30" y="978" font-size="16" font-weight="700" fill="#e6edf7">3 · How the Unity MCP server was used</text>
+
+  <rect x="30" y="996" width="570" height="262" rx="10" fill="#1a1630" stroke="#b18cff"/>
+  <text x="50" y="1022" font-size="13" font-weight="700" fill="#b18cff">Tools called</text>
+  <g font-size="11" fill="#c8d2e6">
+    <text x="50" y="1048" font-family="Consolas, Menlo, monospace" font-size="12" font-weight="700" fill="#e6edf7">Unity_GetConsoleLogs</text>
+    <text x="50" y="1064">Confirmed the editor was reachable, then checked for compile errors after each script change.</text>
+
+    <text x="50" y="1092" font-family="Consolas, Menlo, monospace" font-size="12" font-weight="700" fill="#e6edf7">Unity_RunCommand</text>
+    <text x="50" y="1108">Ran editor C# to resolve packages, create the scene and materials, set D3D11 and</text>
+    <text x="50" y="1122">player settings, build the Windows player, and build the molecule in edit mode.</text>
+
+    <text x="50" y="1150" font-family="Consolas, Menlo, monospace" font-size="12" font-weight="700" fill="#e6edf7">Unity_SceneView_CaptureMultiAngleSceneView</text>
+    <text x="50" y="1166">Front, top and side views to check the model reads as caffeine: fused rings, two</text>
+    <text x="50" y="1180">carbonyls, three methyls, methyl hydrogens out of plane.</text>
+
+    <text x="50" y="1208" font-family="Consolas, Menlo, monospace" font-size="12" font-weight="700" fill="#8b98b0">Unity_AssetGeneration_*  (not used)</text>
+    <text x="50" y="1224">The console reported NoSubscription for Unity AI generation, and the scene needed</text>
+    <text x="50" y="1238">no generated assets: everything is primitives and code.</text>
+  </g>
+
+  <rect x="620" y="996" width="550" height="262" rx="10" fill="#141c2e" stroke="#33466b"/>
+  <text x="640" y="1022" font-size="13" font-weight="700" fill="#e6edf7">What the MCP loop found, and what it could not do</text>
+  <g font-size="11" fill="#c8d2e6">
+    <text x="640" y="1048">• The compiler feedback flagged Unity 6000.6 deprecations</text>
+    <text x="652" y="1062" fill="#9fb0cc">(GetInstanceID, FindFirstObjectByType), so the scripts avoid them.</text>
+    <text x="640" y="1088">• MCP drops (“Unity not detected”) during recompiles and domain</text>
+    <text x="652" y="1102" fill="#9fb0cc">reloads. The fix was to wait for the new assembly, then retry.</text>
+    <text x="640" y="1128">• Build results get buried under shader warnings from the unused</text>
+    <text x="652" y="1142" fill="#9fb0cc">AI inference package, so success was confirmed on disk instead.</text>
+    <text x="640" y="1168">• MCP covers the editor only. The running player, signalling,</text>
+    <text x="652" y="1182" fill="#9fb0cc">Chrome, stats and screenshots were checked with shell and browser</text>
+    <text x="652" y="1196" fill="#9fb0cc">tools, and the player’s own log (encoder = NvCodec).</text>
+    <text x="640" y="1224">• Nothing touched the scene by hand: it was all generated and</text>
+    <text x="652" y="1238" fill="#9fb0cc">rebuilt through code (POC menu items in Assets/Editor/PocSetup.cs).</text>
+  </g>
+
+  <!-- ============ 4. Results ============ -->
+  <text x="30" y="1292" font-size="16" font-weight="700" fill="#e6edf7">4 · Result (localhost, 20 s run)</text>
+  <g text-anchor="middle">
+    <rect x="30" y="1308" width="270" height="72" rx="8" fill="#14231f" stroke="#3ecf8e"/><text x="165" y="1338" font-size="20" font-weight="700" fill="#e6edf7">NVENC · 720p60</text><text x="165" y="1362" font-size="11" fill="#a6c7b9">encoder NvCodec, 0 packets lost</text>
+    <rect x="320" y="1308" width="270" height="72" rx="8" fill="#14231f" stroke="#3ecf8e"/><text x="455" y="1338" font-size="20" font-weight="700" fill="#e6edf7">23.6 ms</text><text x="455" y="1362" font-size="11" fill="#a6c7b9">input round trip p50 (p95 29.4 ms)</text>
+    <rect x="610" y="1308" width="270" height="72" rx="8" fill="#14231f" stroke="#3ecf8e"/><text x="745" y="1338" font-size="20" font-weight="700" fill="#e6edf7">70.2 ms</text><text x="745" y="1362" font-size="11" fill="#a6c7b9">input → displayed frame p50 (p95 90.3 ms)</text>
+    <rect x="900" y="1308" width="270" height="72" rx="8" fill="#2a2113" stroke="#ffb454"/><text x="1035" y="1338" font-size="20" font-weight="700" fill="#e6edf7">Known gap</text><text x="1035" y="1362" font-size="11" fill="#e8cf9c">no keyframe-interval control in the package</text>
+  </g>
+
+  <!-- Footer -->
+  <line x1="30" y1="1404" x2="1170" y2="1404" stroke="#243049"/>
+  <text x="30" y="1426" font-size="12" fill="#8b98b0">Idea: the repo owner. Design, code, builds, testing and documentation: Claude (Claude Code, Sonnet 5.5), driving Unity through the Unity MCP server.</text>
+</svg>

@@ -5,6 +5,19 @@ hardware-encodes it (H.264 via NVENC) and streams it over WebRTC to a plain HTML
 Chrome. The page sends pointer/wheel/keyboard *intents* back over a data channel; the
 server decides what they do. 1:1, no broker, no auth, no TURN. This is a POC, not a product.
 
+![Caffeine streamed to Chrome: stats overlay top-left, photon latency block bottom-left](docs/screenshot.png)
+
+*The stream as seen in Chrome. Top-left is the stats overlay (NVENC H.264, 1280x720 at 60 fps). The black/white
+cells at the bottom-left of the frame are the photon-latency block, which encodes the last applied input number.*
+
+**Status:** working proof of concept, tested on localhost only (Windows, NVIDIA GPU, Chrome).
+Measured on localhost: input round trip p50 23.6 ms, input-to-displayed-frame p50 70.2 ms
+(see [docs/latency-results.md](docs/latency-results.md)).
+
+![Architecture, development process and Unity MCP use](docs/architecture.svg)
+
+*Architecture, how it was built, and how the Unity MCP server was used. Idea supplied by the repo owner; design, code, builds, testing and docs by Claude.*
+
 ```
 Chrome (client/index.html) <--- WebSocket :8080 (SDP + ICE only) ---> Unity player
                            <=== WebRTC H.264 video (NVENC) ==========  (SceneController)
