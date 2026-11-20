@@ -1,0 +1,6 @@
+html, body { margin: 0; height: 100%; background: #111; color: #ddd; font: 12px/1.4 Consolas, monospace; overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#v { width: 100%; height: 100%; object-fit: contain; background: #000; touch-action: none; outline: none; cursor: grab; }
+#hud { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.55); padding: 6px 8px; border-radius: 4px; pointer-events: none; }
+#hud button { pointer-events: auto; margin-top: 4px; }
+#stats { margin: 4px 0 0; }
